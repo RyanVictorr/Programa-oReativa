@@ -1,0 +1,65 @@
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    expose:
+      - "9093"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9093,OUTSIDE://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "my-topic:1:1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  micro-backend:
+    build: ./micro-backend
+    restart: always
+    ports:
+      - "3000:3000"
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: mydatabase
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data  # Mapeando os dados do PostgreSQL para o diretório local ./db_data
+    ports:
+      - "5432:5432"
+      
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+  
+  micro-producer:
+    build: ./micro-producer
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - kafka
+      - zookeeper
+
+  micro-consumer:
+    build: ./micro-consumer
+    restart: always
+    ports:
+      - "4000:4000"
+    depends_on:
+      - kafka
+      - zookeeper
+      - micro-producer
